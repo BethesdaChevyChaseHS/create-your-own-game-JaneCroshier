@@ -5,7 +5,181 @@ package bcc.swinggame;
 
 public class App {
 
-    public static void main(String[] args) {
-        new HelloWorldExample();
+    public class DrawingApp extends JFrame {
+
+    private DrawPanel drawPanel;
+    private Color currentColor = Color.BLACK;
+
+    public DrawingApp() {
+        setTitle("Swing Drawing App");
+        setSize(800, 600);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+
+        drawPanel = new DrawPanel();
+        add(drawPanel, BorderLayout.CENTER);
+
+        JPanel controlPanel = new JPanel();
+        controlPanel.setLayout(new FlowLayout());
+
+        // Brush size slider
+        JSlider brushSlider = new JSlider(1, 50, 10);
+        brushSlider.setPaintTicks(true);
+        brushSlider.setPaintLabels(true);
+        brushSlider.setMajorTickSpacing(10);
+        brushSlider.setMinorTickSpacing(1);
+        brushSlider.addChangeListener(e -> drawPanel.setBrushSize(brushSlider.getValue()));
+        controlPanel.add(new JLabel("Brush Size:"));
+        controlPanel.add(brushSlider);
+
+        // Color buttons
+        addColorButton(controlPanel, "Black", Color.BLACK);
+        addColorButton(controlPanel, "White", Color.WHITE);
+        addColorButton(controlPanel, "Brown", new Color(139, 69, 19));
+        addColorButton(controlPanel, "Red", Color.RED);
+        addColorButton(controlPanel, "Orange", Color.ORANGE);
+        addColorButton(controlPanel, "Yellow", Color.YELLOW);
+        addColorButton(controlPanel, "Green", Color.GREEN);
+        addColorButton(controlPanel, "Blue", Color.BLUE);
+        addColorButton(controlPanel, "Purple", new Color(128, 0, 128));
+
+        // Eraser button
+        JButton eraserButton = new JButton("Eraser");
+        eraserButton.addActionListener(e -> drawPanel.setBrushColor(Color.WHITE));
+        controlPanel.add(eraserButton);
+
+        // Undo/Redo buttons
+        JButton undoButton = new JButton("Undo");
+        undoButton.addActionListener(e -> drawPanel.undo());
+        controlPanel.add(undoButton);
+
+        JButton redoButton = new JButton("Redo");
+        redoButton.addActionListener(e -> drawPanel.redo());
+        controlPanel.add(redoButton);
+
+        add(controlPanel, BorderLayout.NORTH);
+
+        setVisible(true);
     }
+
+    private void addColorButton(JPanel panel, String name, Color color) {
+        JButton button = new JButton();
+        button.setBackground(color);
+        button.setPreferredSize(new Dimension(30, 30));
+        button.setToolTipText(name);
+        button.addActionListener(e -> {
+            currentColor = color;
+            drawPanel.setBrushColor(currentColor);
+        });
+        panel.add(button);
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(DrawingApp::new);
+    }
+
+    class DrawPanel extends JPanel {
+        private BufferedImage canvas;
+        private Graphics2D g2;
+        private int brushSize = 10;
+        private Color brushColor = currentColor;
+        private int prevX, prevY;
+        private Stack<BufferedImage> undoStack = new Stack<>();
+        private Stack<BufferedImage> redoStack = new Stack<>();
+
+        public DrawPanel() {
+            setPreferredSize(new Dimension(800, 600));
+            setBackground(Color.WHITE);
+            addMouseListener(new MouseAdapter() {
+                public void mousePressed(MouseEvent e) {
+                    saveToUndo();
+                    redoStack.clear();
+                    prevX = e.getX();
+                    prevY = e.getY();
+                    draw(prevX, prevY);
+                }
+            });
+
+            addMouseMotionListener(new MouseMotionAdapter() {
+                public void mouseDragged(MouseEvent e) {
+                    draw(e.getX(), e.getY());
+                }
+            });
+        }
+
+        protected void paintComponent(Graphics g) {
+            super.paintComponent(g);
+            if (canvas == null) {
+                canvas = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_INT_RGB);
+                g2 = canvas.createGraphics();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                clearCanvas();
+            }
+            g.drawImage(canvas, 0, 0, null);
+        }
+
+        private void draw(int x, int y) {
+            if (g2 != null) {
+                g2.setColor(brushColor);
+                g2.setStroke(new BasicStroke(brushSize, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawLine(prevX, prevY, x, y);
+                repaint();
+                prevX = x;
+                prevY = y;
+            }
+        }
+
+        public void setBrushColor(Color color) {
+            this.brushColor = color;
+        }
+
+        public void setBrushSize(int size) {
+            this.brushSize = size;
+        }
+
+        private void clearCanvas() {
+            g2.setPaint(Color.WHITE);
+            g2.fillRect(0, 0, getWidth(), getHeight());
+            g2.setPaint(brushColor);
+            repaint();
+        }
+
+        private void saveToUndo() {
+            BufferedImage copy = new BufferedImage(canvas.getWidth(), canvas.getHeight(), canvas.getType());
+            Graphics g = copy.getGraphics();
+            g.drawImage(canvas, 0, 0, null);
+            g.dispose();
+            undoStack.push(copy);
+        }
+
+        public void undo() {
+            if (!undoStack.isEmpty()) {
+                redoStack.push(copyImage(canvas));
+                canvas = undoStack.pop();
+                g2 = canvas.createGraphics();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                repaint();
+            }
+        }
+
+        public void redo() {
+            if (!redoStack.isEmpty()) {
+                undoStack.push(copyImage(canvas));
+                canvas = redoStack.pop();
+                g2 = canvas.createGraphics();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                repaint();
+            }
+        }
+
+        private BufferedImage copyImage(BufferedImage img) {
+            BufferedImage copy = new BufferedImage(img.getWidth(), img.getHeight(), img.getType());
+            Graphics g = copy.getGraphics();
+            g.drawImage(img, 0, 0, null);
+            g.dispose();
+            return copy;
+        }
+    }
+}
+
 }
