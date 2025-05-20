@@ -11,7 +11,7 @@ public class App {
     private Color currentColor = Color.BLACK;
 
     public DrawingApp() {
-        setTitle("Swing Drawing App");
+        setTitle("Drawing App");
         setSize(800, 600);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
